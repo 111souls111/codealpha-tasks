@@ -1,0 +1,70 @@
+Task 1:
+Network Sniffer in Python:
+
+pip install scapy
+import argparse
+from scapy.all import sniff, wrpcap
+from scapy.layers.inet import IP, TCP, UDP
+from scapy.layers.dns import DNS
+from scapy.layers.http import HTTPRequest, HTTPResponse
+
+
+def display_packet(packet):
+    if packet.haslayer(IP):
+        ip_layer = packet.getlayer(IP)
+        print(f"\n[IP] {ip_layer.src} -> {ip_layer.dst}")
+
+    if packet.haslayer(TCP):
+        tcp_layer = packet.getlayer(TCP)
+        print(f"[TCP] {tcp_layer.sport} -> {tcp_layer.dport}")
+
+    if packet.haslayer(UDP):
+        udp_layer = packet.getlayer(UDP)
+        print(f"[UDP] {udp_layer.sport} -> {udp_layer.dport}")
+
+    if packet.haslayer(DNS):
+        dns_layer = packet.getlayer(DNS)
+        if dns_layer.qr == 0:
+            print(f"[DNS] Query: {dns_layer.qd.qname}")
+        elif dns_layer.qr == 1:
+            print(f"[DNS] Response: {dns_layer.an.rrname} -> {dns_layer.an.rdata}")
+
+    if packet.haslayer(HTTPRequest):
+        http_layer = packet.getlayer(HTTPRequest)
+        print(f"[HTTP] Request: {http_layer.Host.decode()}{http_layer.Path.decode()}")
+
+    if packet.haslayer(HTTPResponse):
+        http_layer = packet.getlayer(HTTPResponse)
+        print(f"[HTTP] Response: {http_layer.Server.decode()}")
+
+def packet_sniffer(interface, protocol, count, output_file):
+    protocol_filter = ""
+    if protocol == "http":
+        protocol_filter = "tcp port 80"
+    elif protocol == "dns":
+        protocol_filter = "udp port 53"
+    elif protocol == "tcp":
+        protocol_filter = "tcp"
+    elif protocol == "udp":
+        protocol_filter = "udp"
+    
+    packets = sniff(iface=interface, filter=protocol_filter, prn=display_packet, count=count)
+    
+  
+    if output_file:
+        wrpcap(output_file, packets)
+        print(f"\n[INFO] Saved {count} packets to {output_file}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Advanced Network Sniffer")
+    parser.add_argument("-i", "--interface", required=True, help="Network interface to capture packets from")
+    parser.add_argument("-p", "--protocol", choices=["http", "dns", "tcp", "udp"], help="Protocol to filter (default: all)")
+    parser.add_argument("-c", "--count", type=int, default=0, help="Number of packets to capture (default: unlimited)")
+    parser.add_argument("-o", "--output", help="Output file to save captured packets")
+    args = parser.parse_args()
+    
+    packet_sniffer(args.interface, args.protocol, args.count, args.output)
+
+if __name__ == "__main__":
+    main()
